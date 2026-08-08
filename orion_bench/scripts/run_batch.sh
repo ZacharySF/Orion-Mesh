@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_batch.sh — Fixed version with correct python3 path.
+# Run the configured bitrate sweep and collect a combined summary.
 
 set -euo pipefail
 
@@ -31,15 +31,12 @@ TOTAL=$((${#BITRATES[@]} * REPEATS))
 TRIAL_NUM=1
 PYTHON=$(which python3 2>/dev/null || echo "/run/current-system/sw/bin/python3")
 
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  ORION MESH — BATCH EXPERIMENT                             ║"
-echo "╠══════════════════════════════════════════════════════════════╣"
-echo "║  Bitrates:  ${BITRATES[*]} Mbps"
-echo "║  Repeats:   ${REPEATS} per condition"
-echo "║  Total:     ${TOTAL} trials"
-echo "║  Duration:  ${DURATION}s each + ${COOLDOWN}s cooldown"
-echo "║  Est. time: $(( TOTAL * (DURATION + COOLDOWN) / 60 )) minutes"
-echo "╚══════════════════════════════════════════════════════════════╝"
+echo "Orion Mesh batch"
+echo "  Bitrates: ${BITRATES[*]} Mbps"
+echo "  Repeats: ${REPEATS} per condition"
+echo "  Total: ${TOTAL} trials"
+echo "  Duration: ${DURATION}s, with ${COOLDOWN}s cooldown"
+echo "  Estimated runtime: $(( TOTAL * (DURATION + COOLDOWN) / 60 )) minutes"
 echo ""
 
 read -rp "Press Enter to begin (or Ctrl-C to abort)..."
@@ -51,9 +48,7 @@ START_TIME=$(date +%s)
 for br in "${BITRATES[@]}"; do
     for ((rep = 1; rep <= REPEATS; rep++)); do
         echo ""
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "  Trial ${TRIAL_NUM}/${TOTAL}  —  ${br} Mbps  (repeat ${rep}/${REPEATS})"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Trial ${TRIAL_NUM}/${TOTAL}: ${br} Mbps (repeat ${rep}/${REPEATS})"
 
         if orion-run_trial \
             --drone "$DRONE_IP" \
@@ -63,25 +58,25 @@ for br in "${BITRATES[@]}"; do
             --hz "$HZ" \
             --out "$OUT_DIR" \
             --user "$DRONE_USER"; then
-            echo "  ✓ Trial ${TRIAL_NUM} complete"
+            echo "Trial ${TRIAL_NUM} complete"
         else
-            echo "  ✗ Trial ${TRIAL_NUM} FAILED"
+            echo "Trial ${TRIAL_NUM} failed"
             FAILED+=("${TRIAL_NUM}:${br}Mbps")
         fi
 
         TRIAL_NUM=$((TRIAL_NUM + 1))
 
         if [[ $TRIAL_NUM -le $TOTAL ]]; then
-            echo "  Cooling down ${COOLDOWN}s..."
+            echo "Cooling down for ${COOLDOWN}s..."
             sleep "$COOLDOWN"
         fi
     done
 done
 
-# ── Generate combined CSV summary ──────────────────────────────────────────
+# Build one CSV row per trial result.
 SUMMARY="${OUT_DIR}/summary.csv"
 echo ""
-echo "Generating summary → ${SUMMARY}"
+echo "Generating summary: ${SUMMARY}"
 
 $PYTHON -c "
 import json, glob, csv
@@ -112,12 +107,10 @@ print(f'Merged {len(files)} trial results.')
 
 ELAPSED=$(( $(date +%s) - START_TIME ))
 echo ""
-echo "════════════════════════════════════════════════════════════════"
-echo "  BATCH COMPLETE"
+echo "Batch complete"
 echo "  Total time: $((ELAPSED / 60))m $((ELAPSED % 60))s"
-echo "  Trials:     $((TRIAL_NUM - 1))"
+echo "  Trials: $((TRIAL_NUM - 1))"
 if [[ ${#FAILED[@]} -gt 0 ]]; then
-    echo "  Failed:     ${FAILED[*]}"
+    echo "  Failed: ${FAILED[*]}"
 fi
-echo "  Summary:    ${SUMMARY}"
-echo "════════════════════════════════════════════════════════════════"
+echo "  Summary: ${SUMMARY}"

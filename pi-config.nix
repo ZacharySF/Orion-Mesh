@@ -295,7 +295,7 @@ in
   };
 
   systemd.services.orion-mesh = {
-    description = "Orion Mesh: IBSS + Batman-adv on wlan0 → bat0";
+    description = "Orion Mesh: IBSS and Batman-adv on wlan0 and bat0";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-networkd.service" "sys-subsystem-net-devices-wlan0.device" "sys-subsystem-net-devices-bat0.device" ];
     wants = [ "systemd-networkd.service" "sys-subsystem-net-devices-wlan0.device" ];
@@ -317,20 +317,20 @@ in
         sleep 0.5
       done
 
-      # Step 1: Set wlan0 to IBSS mode (fully idempotent: leave first, then join)
+      # Leave the old cell before putting wlan0 into IBSS mode.
       ${pkgs.iproute2}/bin/ip link set wlan0 down || true
       ${pkgs.iw}/bin/iw dev wlan0 ibss leave 2>/dev/null || true
       ${pkgs.iw}/bin/iw dev wlan0 set type ibss || true
       ${pkgs.iproute2}/bin/ip link set wlan0 up
 
-      # Step 2: Join IBSS cell with fixed BSSID (always succeeds after leave)
+      # Join the shared IBSS cell with a fixed BSSID.
       ${pkgs.iw}/bin/iw dev wlan0 ibss join ${orion.ssid} ${toString orion.freq} fixed-freq ${orion.bssid}
 
-      # Step 3: Add wlan0 to batman-adv (fully idempotent: del first, then add)
+      # Remove a stale attachment before adding wlan0 to batman-adv.
       ${pkgs.batctl}/bin/batctl if del wlan0 2>/dev/null || true
       ${pkgs.batctl}/bin/batctl if add wlan0
 
-      # Step 4: Bring bat0 up (idempotent)
+      # Bring up the BATMAN-adv interface.
       ${pkgs.iproute2}/bin/ip link set bat0 up || true
 
       echo "=== IBSS joined ==="

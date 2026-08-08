@@ -12,7 +12,7 @@
     '';
   };
 
-  # Force NTP port open — allowedUDPPorts alone wasn't working
+  # Chrony needs the NTP port even with allowedUDPPorts configured below.
   networking.firewall.allowedUDPPorts = [ 123 ];
   networking.firewall.extraCommands = ''
     iptables -I INPUT -p udp --dport 123 -j ACCEPT

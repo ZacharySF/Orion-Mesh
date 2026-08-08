@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_trial.sh — Fixed version with CBR video that actually hits target bitrate.
+# Run one control-latency trial from the ground node.
 
 set -euo pipefail
 
@@ -52,34 +52,31 @@ TAG="trial_$(printf '%03d' "$TRIAL_ID")_br${BITRATE_MBPS}"
 TRIAL_DIR="${OUT_DIR}/${TAG}"
 mkdir -p "$TRIAL_DIR"
 
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  ORION MESH — TRIAL ${TRIAL_ID}"
-echo "╠══════════════════════════════════════════════════════════════╣"
-echo "║  Drone:     ${DRONE_USER}@${DRONE_IP}"
-echo "║  Ground:    ${GROUND_IP}"
-echo "║  Bitrate:   ${BITRATE_MBPS} Mbps"
-echo "║  Duration:  ${DURATION}s"
-echo "║  Ctrl Hz:   ${HZ}"
-echo "║  Output:    ${TRIAL_DIR}"
-echo "╚══════════════════════════════════════════════════════════════╝"
+echo "Orion Mesh trial ${TRIAL_ID}"
+echo "  Drone: ${DRONE_USER}@${DRONE_IP}"
+echo "  Ground: ${GROUND_IP}"
+echo "  Bitrate: ${BITRATE_MBPS} Mbps"
+echo "  Duration: ${DURATION}s"
+echo "  Control rate: ${HZ} Hz"
+echo "  Output: ${TRIAL_DIR}"
 echo ""
 
-# ── Verify connectivity ────────────────────────────────────────────────────
+# Check the link before starting background processes.
 echo "[1/6] Checking mesh connectivity..."
 if ! ping -c 2 -W 2 "$DRONE_IP" &>/dev/null; then
     echo "  ERROR: Cannot reach drone at ${DRONE_IP}"
     exit 1
 fi
-echo "  ✓ Drone reachable"
+echo "  Drone reachable"
 
 echo "[2/6] Checking SSH..."
 if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "${DRONE_USER}@${DRONE_IP}" "echo ok" &>/dev/null; then
     echo "  ERROR: SSH to ${DRONE_USER}@${DRONE_IP} failed"
     exit 1
 fi
-echo "  ✓ SSH working"
+echo "  SSH working"
 
-# ── PID tracking for cleanup ───────────────────────────────────────────────
+# Track local processes so an interrupted trial can clean up.
 PIDS=()
 
 cleanup() {
@@ -95,16 +92,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ── Start CPU monitor (local) ──────────────────────────────────────────────
+# Start the ground-node CPU logger.
 echo "[3/6] Starting CPU monitor..."
 orion-cpu_log \
     --duration "$DURATION" \
     --out "${TRIAL_DIR}/cpu.csv" \
     > "${TRIAL_DIR}/cpu_stdout.log" 2>&1 &
 PIDS+=($!)
-echo "  ✓ CPU monitor (PID $!)"
+echo "  CPU monitor (PID $!)"
 
-# ── Start video (local rx + remote tx) ─────────────────────────────────────
+# Start the receiver locally and the transmitter on the drone.
 if [[ "$BITRATE_MBPS" != "0" ]]; then
     echo "[4/6] Starting video receiver..."
     orion-video_rx \
@@ -112,14 +109,13 @@ if [[ "$BITRATE_MBPS" != "0" ]]; then
         --duration "$DURATION" \
         > "${TRIAL_DIR}/video_rx.log" 2>&1 &
     PIDS+=($!)
-    echo "  ✓ Video RX (PID $!)"
+    echo "  Video RX (PID $!)"
 
     sleep 2
 
     echo "  Starting video TX on drone..."
-    # KEY FIX: Use noise source + CBR (minrate=maxrate) so ffmpeg
-    # actually transmits at the target bitrate instead of compressing
-    # a simple test pattern down to ~2 Mbps.
+    # Random image data plus matching min/max rates keeps ffmpeg near the
+    # requested bitrate. A static test pattern compressed too efficiently.
     ssh "${DRONE_USER}@${DRONE_IP}" "nohup bash -c '
         ffmpeg \
             -re \
@@ -139,12 +135,12 @@ if [[ "$BITRATE_MBPS" != "0" ]]; then
             > /tmp/orion_video_tx.log 2>&1
     ' &>/dev/null &"
 
-    echo "  ✓ Video TX started on drone"
+    echo "  Video TX started on drone"
 else
-    echo "[4/6] Baseline — skipping video"
+    echo "[4/6] Baseline; video disabled"
 fi
 
-# ── Start ROS 2 control publisher on drone (remote) ───────────────────────
+# Start the control publisher on the drone.
 echo "[5/6] Starting control publisher on drone..."
 ssh "${DRONE_USER}@${DRONE_IP}" "nohup bash -l -c '
     control_pub --ros-args \
@@ -152,13 +148,13 @@ ssh "${DRONE_USER}@${DRONE_IP}" "nohup bash -l -c '
         > /tmp/orion_control_pub.log 2>&1
 ' &>/dev/null &"
 
-echo "  ✓ Control publisher started on drone"
+echo "  Control publisher started on drone"
 sleep 2
 
-# ── Start ROS 2 control subscriber (local) ────────────────────────────────
+# Start the subscriber on the ground node.
 echo "[6/6] Starting control subscriber..."
 echo ""
-echo "────────────────────── TRIAL RUNNING ──────────────────────────"
+echo "Trial running"
 echo ""
 
 control_sub --ros-args \
@@ -169,7 +165,7 @@ control_sub --ros-args \
     -p out_dir:="$TRIAL_DIR" \
     2>&1 | tee "${TRIAL_DIR}/sub_output.log"
 
-# ── Collect CPU average ───────────────────────────────────────────────────
+# Add average CPU utilization to the trial JSON.
 echo ""
 if [[ -f "${TRIAL_DIR}/cpu.csv" ]]; then
     CPU_AVG=$(awk -F, 'NR>1 { sum+=$2; n++ } END { printf "%.1f", sum/n }' "${TRIAL_DIR}/cpu.csv")
@@ -188,6 +184,4 @@ with open('$JSON_FILE', 'w') as f: json.dump(d, f, indent=2)
 fi
 
 echo ""
-echo "════════════════════════════════════════════════════════════════"
-echo "  Trial ${TRIAL_ID} complete.  Data saved to: ${TRIAL_DIR}/"
-echo "════════════════════════════════════════════════════════════════"
+echo "Trial ${TRIAL_ID} complete. Data saved to: ${TRIAL_DIR}/"

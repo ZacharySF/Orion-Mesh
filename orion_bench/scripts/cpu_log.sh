@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cpu_log.sh — Sample CPU utilization during a trial.
+# Sample CPU utilization during a trial.
 #
 # Reads /proc/stat at 1-second intervals, computes overall CPU%.
 # Outputs a CSV and prints the average on exit.
@@ -69,5 +69,5 @@ if [[ ${#SAMPLES[@]} -gt 0 ]]; then
     echo ""
     echo "[cpu_log] Average CPU: ${AVG}% over ${DURATION}s"
     echo "  Samples: ${#SAMPLES[@]}"
-    [[ -n "$OUT_FILE" ]] && echo "  Saved → ${OUT_FILE}"
+    [[ -n "$OUT_FILE" ]] && echo "  Saved: ${OUT_FILE}"
 fi

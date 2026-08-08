@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# video_rx.sh — Receive and sink the H.264 RTP stream.
+# Receive and discard the H.264 RTP stream during a trial.
 #
 # This just consumes the incoming video to keep the network load active.
-# It decodes to /dev/null — no display needed for the experiment.
+# Frames are decoded to /dev/null because the experiment does not display them.
 #
 # Usage:
 #   ./video_rx.sh                          # listen on default port 5004

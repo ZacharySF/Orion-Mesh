@@ -10,16 +10,15 @@ from rclpy.qos import (
     QoSDurabilityPolicy,
 )
 
-# ── Topics ──────────────────────────────────────────────────────────────────
+# ROS topics used by both nodes
 
 TOPIC_CONTROL = '/orion/control'
 
-# ── QoS ─────────────────────────────────────────────────────────────────────
-# Default: RELIABLE + VOLATILE.  Control messages should not be dropped
-# silently — we *want* DDS to attempt retransmission so we can measure
-# the actual delivery performance (including retransmit-induced latency).
-# Packet "loss" in our experiment = messages that never arrived within
-# the trial window despite DDS reliability.
+# QoS
+# Default: RELIABLE + VOLATILE. DDS retransmission delay remains part of the
+# latency measurement. The subscriber's loss estimate counts internal sequence
+# gaps in the range it receives; it cannot see missing messages outside that
+# range.
 
 QOS_CONTROL = QoSProfile(
     reliability=QoSReliabilityPolicy.RELIABLE,
@@ -41,8 +40,8 @@ def get_qos(reliable: bool = True) -> QoSProfile:
     return QOS_CONTROL if reliable else QOS_BEST_EFFORT
 
 
-# ── Clock helpers ──────────────────────────────────────────────────────────
+# Clock conversion
 
 def stamp_to_sec(stamp) -> float:
-    """Convert builtin_interfaces/Time → float seconds."""
+    """Convert builtin_interfaces/Time to seconds."""
     return stamp.sec + stamp.nanosec * 1e-9

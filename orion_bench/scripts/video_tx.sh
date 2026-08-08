@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# video_tx.sh — Stream H.264 video at a controlled target bitrate.
+# Stream H.264 video at a controlled target bitrate.
 #
 # Uses ffmpeg with a synthetic test pattern (no camera needed) for
 # reproducible, precise bitrate control.  For real camera, use --camera.
@@ -41,7 +41,7 @@ done
 
 # Baseline: no video, just sleep
 if [[ "$BITRATE_MBPS" == "0" ]]; then
-    echo "[video_tx] Baseline (0 Mbps) — no video stream"
+    echo "[video_tx] Baseline (0 Mbps); video disabled"
     sleep "$DURATION"
     exit 0
 fi
@@ -50,7 +50,7 @@ BITRATE_BPS=$((BITRATE_MBPS * 1000000))
 # CBR: set bitrate = maxrate = bufsize for constant rate
 BITRATE_STR="${BITRATE_MBPS}M"
 
-echo "[video_tx] Streaming H.264 → ${DEST_IP}:${PORT}"
+echo "[video_tx] Streaming H.264 to ${DEST_IP}:${PORT}"
 echo "  Bitrate:    ${BITRATE_MBPS} Mbps"
 echo "  Resolution: ${RESOLUTION}"
 echo "  FPS:        ${FPS}"
@@ -62,7 +62,7 @@ if $USE_CAMERA; then
     # Adjust /dev/video0 if needed
     INPUT_ARGS=(-f v4l2 -input_format yuv420p -video_size "$RESOLUTION" -framerate "$FPS" -i /dev/video0)
 else
-    # Synthetic test pattern — fully reproducible, no hardware needed
+    # The default test pattern does not require camera hardware.
     INPUT_ARGS=(-f lavfi -i "testsrc=duration=${DURATION}:size=${RESOLUTION}:rate=${FPS}")
 fi
 

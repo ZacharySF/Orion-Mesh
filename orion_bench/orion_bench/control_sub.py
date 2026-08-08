@@ -1,8 +1,7 @@
 """
-control_sub — Subscribe to control messages, measure all dependent variables.
+Receive ROS 2 control messages and record latency statistics.
 
-Records per-message latency, computes trial-level statistics matching the
-paper's required metrics, and outputs structured CSV-compatible results.
+Records per-message latency and writes both raw samples and a trial summary.
 
 Dependent variables measured:
   - Mean latency (ms)
@@ -38,10 +37,10 @@ class ControlSubscriber(Node):
     def __init__(self):
         super().__init__('control_sub')
 
-        # ── Parameters ──────────────────────────────────────────────────
+        # Runtime parameters
         self.declare_parameter('reliable', True)
         self.declare_parameter('duration', 0)       # 0 = run until Ctrl-C
-        self.declare_parameter('bitrate_label', 0)   # target bitrate (Mbps) — metadata only
+        self.declare_parameter('bitrate_label', 0)   # target bitrate label in Mbps
         self.declare_parameter('trial_id', 0)
         self.declare_parameter('out_dir', '')         # save trial results here
         self.declare_parameter('live_interval', 100)  # print live stats every N msgs
@@ -58,7 +57,7 @@ class ControlSubscriber(Node):
             TwistStamped, common.TOPIC_CONTROL, self._on_msg, qos
         )
 
-        # ── State ───────────────────────────────────────────────────────
+        # Samples collected during this run
         self._latencies: list[float] = []   # ms
         self._seqs: list[int] = []
         self._recv_count = 0
@@ -111,7 +110,7 @@ class ControlSubscriber(Node):
                 f"max={arr.max():.2f} ms"
             )
 
-    # ── Trial report ────────────────────────────────────────────────────
+    # Trial summary
 
     def compute_results(self) -> dict:
         """Compute all dependent variables for this trial."""
@@ -160,7 +159,7 @@ class ControlSubscriber(Node):
     def print_report(self, results: dict):
         """Pretty-print the trial report to terminal."""
         print("\n" + "=" * 68)
-        print(f"  TRIAL {results.get('trial_id', '?')}  —  "
+        print(f"  TRIAL {results.get('trial_id', '?')}  |  "
               f"Target bitrate: {results.get('bitrate_target_mbps', '?')} Mbps")
         print("=" * 68)
         print(f"  Duration:          {results.get('duration_s', 0):.1f} s")
@@ -206,7 +205,7 @@ class ControlSubscriber(Node):
         json_path = os.path.join(self._out_dir, f"{tag}_results.json")
         with open(json_path, 'w') as f:
             json.dump(results, f, indent=2)
-        print(f"  Saved results → {json_path}")
+        print(f"  Saved results: {json_path}")
 
         # Raw per-message latencies (for external analysis)
         csv_path = os.path.join(self._out_dir, f"{tag}_raw.csv")
@@ -214,7 +213,7 @@ class ControlSubscriber(Node):
             f.write("seq,latency_ms\n")
             for seq, lat in zip(self._seqs, self._latencies):
                 f.write(f"{seq},{lat:.4f}\n")
-        print(f"  Saved raw data → {csv_path}")
+        print(f"  Saved raw data: {csv_path}")
 
 
 def main(args=None):

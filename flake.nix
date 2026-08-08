@@ -1,5 +1,5 @@
 {
-  description = "Orion mesh — ROS 2 control-message latency vs H.264 video load";
+  description = "Orion mesh: ROS 2 control-message latency under H.264 video load";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -40,19 +40,19 @@
     ];
   in {
 
-    # nix build .#drone   — flash to the Pi 4
+    # nix build .#drone   (Pi 4 image)
     nixosConfigurations.drone = nixpkgs.lib.nixosSystem {
       system = "aarch64-linux";
       modules = sharedModules ++ [ ./drone.nix ];
     };
 
-    # nix build .#ground  — flash to the Pi 3
+    # nix build .#ground  (Pi 3 image)
     nixosConfigurations.ground = nixpkgs.lib.nixosSystem {
       system = "aarch64-linux";
       modules = sharedModules ++ [ ./ground.nix ];
     };
 
-    # ── Dev shell for building orion_bench with colcon ──────────────
+    # Development shell for building orion_bench with colcon
     devShells.aarch64-linux.default = let
       pkgs = import nixpkgs {
         system = "aarch64-linux";
@@ -77,7 +77,7 @@
       shellHook = ''
         export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
         export ROS_DOMAIN_ID=42
-        echo "Orion bench dev shell — run: colcon build --packages-select orion_bench"
+        echo "Orion bench dev shell. Run: colcon build --packages-select orion_bench"
       '';
     };
   };

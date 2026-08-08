@@ -1,5 +1,5 @@
 """
-control_pub — Publish ROS 2 control messages at a fixed rate.
+Publish timestamped ROS 2 control messages at a fixed rate.
 
 Sends geometry_msgs/TwistStamped at ~50 Hz (configurable).  Each message
 carries the publish timestamp in header.stamp and a sequence number in
@@ -27,7 +27,7 @@ class ControlPublisher(Node):
     def __init__(self):
         super().__init__('control_pub')
 
-        # ── Parameters ──────────────────────────────────────────────────
+        # Runtime parameters
         self.declare_parameter('hz', 50)
         self.declare_parameter('reliable', True)
         self.declare_parameter('duration', 0)  # 0 = run forever (Ctrl-C to stop)
@@ -64,7 +64,7 @@ class ControlPublisher(Node):
 
         msg = TwistStamped()
 
-        # Timestamp for latency measurement (uses ROS clock → wall clock
+        # Timestamp for latency measurement. The ROS clock must match wall clock
         # when use_sim_time is false, which is our case)
         msg.header.stamp = self.get_clock().now().to_msg()
 
