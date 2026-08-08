@@ -27,7 +27,7 @@ The experiment has been completed, data has been collected, and a paper has been
 
 ## Experiment design
 
-The drone node publishes `geometry_msgs/TwistStamped` messages at 50 Hz while transmitting synthetic H.264 video. The ground node receives both streams and records control-message latency, jitter, sequence-gap packet loss, and CPU utilization.
+The drone node publishes `geometry_msgs/TwistStamped` messages at 50 Hz while transmitting synthetic H.264 video. During the overlapping portion of each run, the ground node receives both streams and records one-way control-message latency, the population standard deviation of that latency, internal sequence gaps, and CPU utilization.
 
 | Item | Configuration |
 | --- | --- |
@@ -36,9 +36,9 @@ The drone node publishes `geometry_msgs/TwistStamped` messages at 50 Hz while tr
 | ROS 2 middleware | CycloneDDS |
 | Network | BATMAN-adv over an IBSS Wi-Fi link |
 | Primary measurements | Mean, median, p95, p99, and maximum one-way latency |
-| Other measurements | Jitter, sequence-gap packet loss, and CPU utilization |
+| Other measurements | Population standard deviation of latency, internal observed sequence-gap loss, and CPU utilization |
 
-Each control message carries its send timestamp and a sequence number. The subscriber compares that timestamp with its local receive time and uses gaps in the sequence to estimate messages that did not arrive during the trial window.
+Each control message carries its send timestamp and a sequence number. The subscriber compares that timestamp with its local receive time. Its loss metric counts gaps between the minimum and maximum sequence numbers received; it cannot count losses before the first or after the last received message, and its `packets_sent` value is an inferred sequence span rather than the publisher's actual count.
 
 One-way latency is only meaningful when the node clocks agree. Chrony provides clock synchronization, and its measured offset should be checked before every collection run.
 
@@ -53,7 +53,7 @@ The public configuration intentionally locks the `ground` account with `hashedPa
 - keep private keys and real password hashes out of this repository; and
 - update the drone address in `ground.nix` if your drone node does not use the configured `10.23.212.203` address.
 
-The ground node also needs its public key authorized on the drone before it can start remote publisher and video processes. An operator key used to log into both Pis does not automatically provide ground-to-drone access.
+The ground node also needs the matching private key for a public key authorized on the drone, and the drone host key must already be accepted or provisioned in the ground node's `known_hosts`. The public image provisions neither. Because the account is locked, `ssh-copy-id` cannot bootstrap this through password login unless you temporarily provide a password hash through private configuration. Establish and verify noninteractive ground-to-drone SSH before collecting data; `orion-run_trial` checks it with `BatchMode=yes`.
 
 ### 2. Build the role-specific SD images
 
@@ -121,12 +121,16 @@ Run the complete configured bitrate sweep:
 orion-run_batch --drone <drone-bat0-ip> --repeats 5 --cooldown 30
 ```
 
-The batch runner writes `summary.csv`. Each trial directory also contains:
+The batch runner writes `summary.csv`. Each trial directory contains:
 
 - `trial_NNN_brX_results.json` — trial-level metrics;
 - `trial_NNN_brX_raw.csv` — per-message sequence numbers and latency;
-- `cpu.csv` — CPU utilization samples; and
-- ffmpeg and ROS 2 logs for troubleshooting.
+- `cpu.csv` — CPU utilization samples;
+- `cpu_stdout.log` — CPU monitor output;
+- `sub_output.log` — subscriber output; and
+- `video_rx.log` — receiver output for nonzero-bitrate trials only.
+
+The drone-side publisher and video-transmitter logs remain on the drone at `/tmp/orion_control_pub.log` and `/tmp/orion_video_tx.log`; the runner does not copy them into the trial directory. Baseline trials do not produce an ffmpeg receiver log.
 
 ## Repository map
 
@@ -143,7 +147,7 @@ The batch runner writes `summary.csv`. Each trial directory also contains:
 
 ## Design choices
 
-- **Reliable control QoS:** Retransmission delay remains part of measured latency. In this experiment, packet loss means a sequence number did not arrive during the trial window despite reliable delivery.
+- **Reliable control QoS:** Retransmission delay remains part of measured latency. The reported loss value represents only internal gaps in the observed sequence span despite reliable delivery.
 - **High-entropy synthetic video:** Random image data avoids the unrealistically low traffic produced when a static test pattern compresses too easily.
 - **Declarative node images:** NixOS keeps the operating system, mesh configuration, middleware, and benchmark tools consistent across both Pis.
 - **Role separation:** Shared configuration lives in `pi-config.nix`; clock-reference behavior remains explicit in `drone.nix` and `ground.nix`.
@@ -153,5 +157,8 @@ The batch runner writes `summary.csv`. Each trial directory also contains:
 - The public repository does not yet include the collected dataset or paper.
 - A two-node BATMAN-adv link does not exercise multi-hop route selection.
 - One-way latency remains sensitive to residual clock-synchronization error.
+- The reported `jitter_ms` value is `numpy.std` over one-way latency, not inter-arrival jitter or packet-delay variation.
+- Loss before the first received sequence number or after the last received sequence number is not observable with the current subscriber calculation.
+- The transmitter and publisher start before the subscriber and use the same nominal duration, so they stop before the subscriber's measurement window ends; the current run is not a full-duration overlap.
 - The bitrate condition is the encoder target; the current result files do not independently record measured network throughput.
 - The publisher generates synthetic control values rather than commands from a flight controller.
