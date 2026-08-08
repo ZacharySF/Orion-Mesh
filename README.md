@@ -1,6 +1,6 @@
 # Orion Mesh
 
-Orion Mesh is the test harness for my AP Research experiment. I wanted to measure what happens to ROS 2 control traffic when an H.264 stream competes for the same Wi-Fi channel on a low-cost BATMAN-adv network.
+Orion Mesh measures how ROS 2 control traffic behaves when an H.264 stream competes for the same Wi-Fi channel on a low-cost BATMAN-adv network.
 
 The setup uses two Raspberry Pis running NixOS. The drone node publishes `geometry_msgs/TwistStamped` messages at 50 Hz while sending H.264 video. The ground node receives both streams and records control-message latency, jitter, packet loss, and CPU use.
 
