@@ -10,8 +10,6 @@ DURATION=120
 HZ=50
 OUT_DIR="${HOME}/trials"
 DRONE_USER="ground"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 BITRATES=(0 1 2 4 6 8 10 12 15)
 
 while [[ $# -gt 0 ]]; do
@@ -57,7 +55,7 @@ for br in "${BITRATES[@]}"; do
         echo "  Trial ${TRIAL_NUM}/${TOTAL}  —  ${br} Mbps  (repeat ${rep}/${REPEATS})"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-        if bash "${SCRIPT_DIR}/run_trial.sh" \
+        if orion-run_trial \
             --drone "$DRONE_IP" \
             --bitrate "$br" \
             --trial "$TRIAL_NUM" \
